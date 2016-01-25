@@ -1,25 +1,174 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: 'Reproducible Research: Peer Assessment 1'
+author: "Mohsen Najafi Yazdi"
+output: html_document
 ---
 
+This is a report on statistical investigation of a sample [personal activity monitoring device dataset](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip) as the first project of Reproducible Research course. This report is publicly avaliable at: https://github.com/MarlexBlank/RepData_PeerAssessment1
 
 ## Loading and preprocessing the data
 
-
+```{r, echo= TRUE}
+  dataFile <- unz("activity.zip","activity.csv")
+  rawData <- read.csv(dataFile,header = TRUE,sep = ",",stringsAsFactors = FALSE)
+  head(rawData)
+```
 
 ## What is mean total number of steps taken per day?
+To answer this question, we first need to calculate the number of steps taken __each day__.
 
+#### Calculating the total number of steps taken each day:
+```{r, echo= TRUE}
+  perDayData <- split(rawData,rawData$date)
+  numDays <- length(perDayData)
+  stepsPerDay <- data.frame(dates = names(perDayData) , steps = 0)
+  for ( iDay in 1:numDays )
+  {
+    todayData <- perDayData[iDay]
+    todayData <- do.call(rbind.data.frame,todayData)
+    stepsPerDay$steps[iDay] <- sum(todayData$steps)
+  }
+  
+```
+The variable `stepsPerDay` contains the desired data.
 
+#### Plotting histogram of number of steps taken per day:
+```{r, echo= TRUE}
+  hist(stepsPerDay$steps , main = "Histogram of number of steps per day", 
+       col = "green" , xlab = "Number of steps per day" , breaks = 10)
+```
+
+#### Mean and median of number of steps taken per day:
+```{r, echo= TRUE}
+  stepsMean <- mean(stepsPerDay$steps[!is.na(stepsPerDay$steps)]) 
+  print(paste("Mean = ",stepsMean))
+  
+  stepsMedian <- median(stepsPerDay$steps[!is.na(stepsPerDay$steps)]) 
+  print(paste("Median = ",stepsMedian))
+```
 
 ## What is the average daily activity pattern?
+To answer this question, we first need to create a time series for __each 5-min interval__.
 
+#### Creating the desired data:
+```{r, echo= TRUE}
+  timeSeries <- split(rawData,rawData$interval)
+  numIntervals <- length(timeSeries)
+  averageStepsPerInterval <- data.frame(interval = names(timeSeries) , avgerageSteps = 0)
+  for ( iInterval in 1:numIntervals )
+  {
+    thisIntervalData <- timeSeries[iInterval]
+    thisIntervalData <- do.call(rbind.data.frame,thisIntervalData)
+    averageStepsPerInterval$avgerageSteps[iInterval] <- mean(
+      thisIntervalData$steps[!is.na(thisIntervalData$steps)])
+  }
+```
+The variable `averageStepsPerInterval` contains the desired data.
 
+#### Ploting the time series:
+```{r, echo= TRUE}
+  plot(as.character(averageStepsPerInterval$interval),averageStepsPerInterval$avgerageSteps,type = "l", 
+       xlab = "Interval" , ylab = "Average # of steps" , main = "Average number of steps")
+```
+
+#### Finding the inverval which, on average across all days, has the maximum number of steps:
+```{r, echo= TRUE}
+  maxIndex = which(averageStepsPerInterval$avgerageSteps == max(averageStepsPerInterval$avgerageSteps))
+  print(paste("The interval",as.character(averageStepsPerInterval$interval[maxIndex[1]]),
+              " has the maximum average number of steps which is",
+              as.character(averageStepsPerInterval$avgerageSteps[maxIndex[1]])))
+```
 
 ## Imputing missing values
+In this section, we deal with missing values and replace them with real values.
+#### Finding the total number of missing values:
+```{r, echo= TRUE}
+  print(paste("The total number of missing values is",sum(is.na(rawData$steps))))
+```
+#### Strategy for filling the missing values:
+I will use the __mean of 5-min intervals across all days__ to fill in the missing values. The reason behind it is that a person most likely has a fixed daily schedule. Hence, the general pattern of a day, on average, could be a good alternative for missing values.
 
+#### Calculating the mean of 5-min interval across days:
+```{r, echo= TRUE}
+  timeSeries <- split(rawData,rawData$interval)
+  numIntervals <- length(timeSeries)
+  meanStepsPerInterval <- data.frame(interval = names(timeSeries) , meanSteps = 0)
+  for ( iInterval in 1:numIntervals )
+  {
+    thisIntervalData <- timeSeries[iInterval]
+    thisIntervalData <- do.call(rbind.data.frame,thisIntervalData)
+    meanStepsPerInterval$meanSteps[iInterval] <- mean(
+      thisIntervalData$steps[!is.na(thisIntervalData$steps)])
+  }
+```
+The variable `meanStepsPerInterval` contains the desired data.
 
+#### Replacing missing values with the calculated data:
+```{r, echo= TRUE}
+  naIndex = which(is.na(rawData$steps) == TRUE)
+  numMissingData = length(naIndex)
+  cleanData <- rawData
+  for ( i in 1:numMissingData )
+  {
+    cleanData$steps[i] <- meanStepsPerInterval$meanSteps[
+      which(meanStepsPerInterval$interval == rawData$interval[i])]
+  }
+  head(cleanData)
+```
+The variable `cleanData` contains the desired data.
+
+#### Plotting histogram of clean data, and calculating mean and median as before:
+```{r, echo= TRUE}
+  perDayData <- split(cleanData,cleanData$date)
+  numDays <- length(perDayData)
+  stepsPerDay <- data.frame(dates = names(perDayData) , steps = 0)
+  for ( iDay in 1:numDays )
+  {
+    todayData <- perDayData[iDay]
+    todayData <- do.call(rbind.data.frame,todayData)
+    stepsPerDay$steps[iDay] <- sum(todayData$steps)
+  }
+  
+  hist(stepsPerDay$steps , main = "Histogram of number of steps per day (clean data)", 
+       col = "green" , xlab = "Number of steps per day" , breaks = 10)
+
+  stepsMean <- mean(stepsPerDay$steps[!is.na(stepsPerDay$steps)]) 
+  print(paste("Mean (clean data) = ",stepsMean))
+  
+  stepsMedian <- median(stepsPerDay$steps[!is.na(stepsPerDay$steps)]) 
+  print(paste("Median (clean data) = ",stepsMedian))
+```
+
+#### The impact of imputing missing data on the estimates of the total daily number of steps:
+Since I used the __mean of 5-min intervals across all days__, it did not have a significant impact on the distribution of total daily number of steps. The reason is because __total daily number of steps__ is simply the summation over all intervals. Hence, replacing the missing value with the __mean value of that interval__ is basically a realization from the same distribution.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+#### Creating a new factor for __weekdays__ and __weekend__:
+```{r, echo= TRUE}
+  cleanData$dayType <- ifelse(weekdays(as.Date(cleanData$date)) == 
+      "Sunday" | weekdays(as.Date(cleanData$date)) == "Saturday",
+      "weekend","weekday")
+  head(cleanData)
+```
+The variable `cleanData` contains the desired data.
+
+#### Plotting the 5-min interval time series for weekdays and weekends:
+```{r, echo= TRUE}
+  timeSeries <- split(cleanData,cleanData$interval)
+  numIntervals <- length(timeSeries)
+  averageStepsPerInterval <- data.frame(interval = names(timeSeries) , weekdaySteps = 0 , weekendSteps = 0)
+  for ( iInterval in 1:numIntervals )
+  {
+    thisIntervalData <- timeSeries[iInterval]
+    thisIntervalData <- do.call(rbind.data.frame,thisIntervalData)
+    averageStepsPerInterval$weekdaySteps[iInterval] <- mean(
+      thisIntervalData$steps[!is.na(thisIntervalData$steps) & thisIntervalData$dayType == "weekday"])
+    averageStepsPerInterval$weekendSteps[iInterval] <- mean(
+      thisIntervalData$steps[!is.na(thisIntervalData$steps) & thisIntervalData$dayType == "weekend"])
+  }
+  par(mfrow=c(2,1))
+  plot(as.character(averageStepsPerInterval$interval),averageStepsPerInterval$weekdaySteps,type = "l", 
+       xlab = "Interval" ,ylab = "", main = "Average number of steps (weekdays)")
+  plot(as.character(averageStepsPerInterval$interval),averageStepsPerInterval$weekendSteps,type = "l", 
+       xlab = "Interval" ,ylab = "", main = "Average number of steps (weekends)")
+```
